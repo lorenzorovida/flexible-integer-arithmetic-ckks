@@ -2,7 +2,7 @@
 
 [![CMake on multiple platforms](https://github.com/lorenzorovida/flexible-integer-arithmetic-ckks/actions/workflows/cmake-multiple-platform.yml/badge.svg)](https://github.com/lorenzorovida/flexible-integer-arithmetic-ckks/actions/workflows/cmake-multiple-platform.yml)
 <br>
-<a href="https://eprint.iacr.org/2025/1150"><img src="imgs/preprint_icon.png" alt="Link to the preprint PDF" width=130px ></a>
+<a href="https://eprint.iacr.org/2025/1150"><img src="imgs/preprint_icon.svg" alt="Link to the preprint PDF" ></a>
 
 <img src="imgs/console.gif" width="650"/>
 
