@@ -4,15 +4,7 @@ project(FlexibleIntsCKKS)
 set(CMAKE_CXX_STANDARD 17)
 option( BUILD_STATIC "Set to ON to include static versions of the library" OFF)
 
-list(APPEND CMAKE_PREFIX_PATH "/Users/myuser/openfhe-development-chebyshevSIMD/build")
-
-set(OpenFHE_DIR "/Users/myuser/openfhe-development-chebyshevSIMD/build")
 set(CMAKE_PREFIX_PATH "/Users/myuser/openfhe-development-chebyshevSIMD/build" ${CMAKE_PREFIX_PATH})
-
-set(CMAKE_BUILD_RPATH "${CMAKE_SOURCE_DIR}/Users/myuser/openfhe-development-chebyshevSIMD/build")
-set(CMAKE_INSTALL_RPATH "${CMAKE_SOURCE_DIR}/Users/myuser/openfhe-development-chebyshevSIMD/build")
-
-
 
 find_package(OpenFHE CONFIG REQUIRED)
 if (OpenFHE_FOUND)
@@ -48,9 +40,6 @@ endif()
 
 add_executable(FlexibleIntsCKKS src/main.cpp src/CKKSController.cpp src/CKKSController.h src/Utils.h src/Logger.h)
 
-target_link_directories(FlexibleIntsCKKS PRIVATE
-        /Users/myuser/openfhe-development-chebyshevSIMD/build
-        )
 
 target_link_libraries(FlexibleIntsCKKS PRIVATE
         OPENFHEpke

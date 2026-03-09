@@ -233,8 +233,9 @@ void read_arguments(int argc, char* argv[]) {
 
             ++i;
         }
-        if (arg == "--test" && i + 1 < argc) {
+        if (arg == "--test") {
             cout << "The program has been compiled and linked successfully, now checking if keygen works..." << endl;
+            test = true;
         }
         if (arg == "--input") {
             input_mode = true;
