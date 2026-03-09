@@ -1,8 +1,8 @@
 # A flexible and polynomial framework for integer arithmetic in CKKS
 
-<img src="https://github.com/lorenzorovida/flexible-integer-arithmetic-ckks/actions/workflows/cmake-multiple-platform.yml/badge.svg" alt="CMake build result" width=230 >
-
-
+[![CMake on multiple platforms](https://github.com/lorenzorovida/flexible-integer-arithmetic-ckks/actions/workflows/cmake-multiple-platform.yml/badge.svg)](https://github.com/lorenzorovida/flexible-integer-arithmetic-ckks/actions/workflows/cmake-multiple-platform.yml)
+<br>
+<a href="https://eprint.iacr.org/2025/1150"><img src="imgs/preprint_icon.png" alt="Link to the preprint PDF" width=130px ></a>
 
 <img src="imgs/console.gif" width="650"/>
 
