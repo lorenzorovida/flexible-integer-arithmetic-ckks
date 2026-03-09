@@ -1,0 +1,7 @@
+openfhe/.DS_Store
+.DS_Store
+/openfhe/.idea
+/openfhe/cmake-build-debug
+/openfhe/cmake-build-release
+/build
+/.idea
