@@ -4,13 +4,13 @@ project(FlexibleIntsCKKS)
 set(CMAKE_CXX_STANDARD 17)
 option( BUILD_STATIC "Set to ON to include static versions of the library" OFF)
 
-list(APPEND CMAKE_PREFIX_PATH "/Users/narger/Desktop/OpenFHE-Fork/openfhe-development-chebyshevSIMD/build")
+list(APPEND CMAKE_PREFIX_PATH "/Users/myuser/openfhe-development-chebyshevSIMD/build")
 
-set(OpenFHE_DIR "/Users/narger/Desktop/OpenFHE-Fork/openfhe-development-chebyshevSIMD/build")
-set(CMAKE_PREFIX_PATH "/Users/narger/Desktop/OpenFHE-Fork/openfhe-development-chebyshevSIMD/build" ${CMAKE_PREFIX_PATH})
+set(OpenFHE_DIR "/Users/myuser/openfhe-development-chebyshevSIMD/build")
+set(CMAKE_PREFIX_PATH "/Users/myuser/openfhe-development-chebyshevSIMD/build" ${CMAKE_PREFIX_PATH})
 
-set(CMAKE_BUILD_RPATH "${CMAKE_SOURCE_DIR}/Users/narger/Desktop/OpenFHE-Fork/openfhe-development-chebyshevSIMD/build")
-set(CMAKE_INSTALL_RPATH "${CMAKE_SOURCE_DIR}/Users/narger/Desktop/OpenFHE-Fork/openfhe-development-chebyshevSIMD/build")
+set(CMAKE_BUILD_RPATH "${CMAKE_SOURCE_DIR}/Users/myuser/openfhe-development-chebyshevSIMD/build")
+set(CMAKE_INSTALL_RPATH "${CMAKE_SOURCE_DIR}/Users/myuser/openfhe-development-chebyshevSIMD/build")
 
 
 
@@ -49,7 +49,7 @@ endif()
 add_executable(FlexibleIntsCKKS main.cpp CKKSController.cpp CKKSController.h Utils.h Logger.h)
 
 target_link_directories(FlexibleIntsCKKS PRIVATE
-        /Users/narger/Desktop/OpenFHE-Fork/openfhe-development-chebyshevSIMD/build
+        /Users/myuser/openfhe-development-chebyshevSIMD/build
         )
 
 target_link_libraries(FlexibleIntsCKKS PRIVATE
