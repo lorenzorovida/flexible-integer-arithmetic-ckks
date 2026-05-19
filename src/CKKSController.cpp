@@ -5,8 +5,8 @@ void CKKSController::generate_context_for_bootstrapping(int ring, int levels) {
 
     parameters.SetSecretKeyDist(lbcrypto::SPARSE_ENCAPSULATED);
 
-    int dcrtBits = 40;
-    int firstMod = 41;
+    int dcrtBits = 36;
+    int firstMod = 37;
 
     depth = levels + FHECKKSRNS::GetBootstrapDepth({4, 3}, lbcrypto::SPARSE_ENCAPSULATED);
 
@@ -69,6 +69,27 @@ void CKKSController::generate_rotation_keys_inverse(vector<int> indexes) {
 void CKKSController::generate_rotations_for_additions(int bits) {
     for (int i = 1; i < bits; i *= 2)
         generate_rotation_key(-i);
+}
+
+void CKKSController::generate_rotations_for_bit_length(int bits) {
+    for (int i = 1; i < bits; i *= 2)
+        generate_rotation_key(i);
+
+    for (int i = 1; i < 256; i *= 2)
+        generate_rotation_key(i);
+
+    generate_rotation_key(7);
+
+    generate_rotation_key(1);
+    generate_rotation_key(2);
+    generate_rotation_key(3);
+    generate_rotation_key(4);
+    generate_rotation_key(5);
+    generate_rotation_key(6);
+    generate_rotation_key(bits - 1 - 8);
+    generate_rotation_key(bits - 7);
+    generate_rotation_key(-bits);
+    generate_rotation_key(-bits-1);
 }
 
 void CKKSController::generate_rotations_for_multiplications(int bits) {
@@ -195,6 +216,11 @@ Ctxt CKKSController::sub(const Ctxt &a, const Ctxt &b) {
 Ctxt CKKSController::sub(const Ctxt &c, const Ptxt &p) {
     Ptxt temp(p);
     return context->EvalSub(c, temp);
+}
+
+Ctxt CKKSController::sub(const Ptxt &p, const Ctxt &c) {
+    Ptxt temp(p);
+    return context->EvalSub(temp, c);
 }
 
 Ctxt CKKSController::sub(double d, const Ctxt &c) {
@@ -357,6 +383,11 @@ Ctxt CKKSController::csa4(const Ctxt &a, const Ctxt &b, const Ctxt &c, const Ctx
     Ctxt result = add_integer(s2, c2, bits, false);
 
     return result;
+}
+
+Ctxt CKKSController::binary_or(const Ctxt &a, const Ctxt &b) {
+    // a+b - a*b
+    return sub(add(a, b), mult(a, b));
 }
 
 
@@ -708,6 +739,164 @@ Ctxt CKKSController::shf_integer(const Ctxt &a, int shift, int bits) {
     return rot(mult(a, mask), -shift);
 }
 
+Ctxt CKKSController::bit_length(const Ctxt &a, int bits) {
+    //TODO write it (similar as below)
+}
+
+Ctxt CKKSController::inverse_bit_length(const Ctxt &a, int bits) {
+    int step = 1;
+    Ctxt result = a->Clone();
+    while (step < bits) {
+        result = binary_or(result, rot(result, step));
+        step *= 2;
+    }
+
+    // Now we sum all the ones
+    for (int i = 0; i < log2(bits); i++) {
+        result = add(result, rot(result, -pow(2, i)));
+    }
+
+    //The result is in the last (partial) slot
+    vector<double> mask(result->GetSlots()); //TODO mettere batched
+
+    mask[bits - 1] = -1/(bits / 2.0);
+    result = mult(result, mask);
+
+    mask[bits - 1] = 1.0;
+    result = add(result, encode(mask, result->GetLevel()));
+
+    Ctxt resultclone = result->Clone();
+
+    result = add(result, rot(result, 1));
+    result = add(result, rot(result, 2));
+    result = add(result, rot(result, 4));
+    result = sub(result, rot(resultclone, 7));
+
+    result = rot(result, bits - 7);
+
+    return result;
+}
+
+/*
+ * Takes as input a 'bits' size input a, and a number of at most 7 bits (128 at most), LSB to MSB in binary, to the RIGHT
+ */
+Ctxt CKKSController::blind_rotation(const Ctxt &a, const Ctxt &index, int bits) {
+    Ctxt result = a->Clone();
+
+    for (int i = 0; i < 7; i++) {
+        vector<double> mask(a->GetSlots());
+        mask[i] = 1;
+        Ctxt current_index = mult(index, encode(mask, index->GetLevel()));
+        current_index = rot(current_index, i);
+        for (int j = 0; j < log2(bits); j++) {
+            //Filling
+            current_index = add(current_index, rot(current_index, -pow(2, j)));
+        }
+
+        //If condition
+        result = add(mult(result, sub(1, current_index)), mult(rot(result, -pow(2, i)), current_index));
+    }
+
+    return result;
+}
+
+Ctxt CKKSController::div_integer(const Ctxt &num, const Ctxt &den, int bits) {
+    int LUT_BITS = 8;
+
+    //This is bits - den.bit_length()
+    Ctxt b = inverse_bit_length(den, bits);
+
+    vector<vector<double>> coeffs;
+    coeffs.push_back(read_vector_file("../coeffs/p1-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p2-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p3-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p4-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p5-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p6-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p7-norm-247-LUT-DIVISION.txt"));
+
+    for (int i = 0; i < 32-7; i++) coeffs.push_back(read_vector_file("../coeffs/p1-norm-247-LUT-DIVISION.txt")); //Garbage slots
+
+    Ctxt s = context->EvalChebyshevSeriesPSBatchRepeated(b, coeffs, -1, 1, (int)(b->GetSlots() / coeffs.size()));
+
+    s = binboot(s);
+
+    Ctxt den_norm = blind_rotation(den, s, bits); //This performs the den << (bits - s.bit_length()) step
+
+    den_norm = binboot(den_norm);
+
+    Ctxt den_norm_rot = rot(den_norm, bits - 1 - LUT_BITS);
+
+    // Now the index must be in decimal to be given as input to the Chebyshev-LUT
+    vector<double> mask(den_norm_rot->GetSlots());
+    for (int i = 0; i < LUT_BITS; i++) mask[i] = pow(2, i);
+    Ctxt idx = mult(den_norm_rot, mask);
+
+    //N.b. idx \in [0, 256]
+    for (int i = 0; i < log2(256); i++) {
+        idx = add(idx, rot(idx, pow(2, i)));
+    }
+
+    fill(mask.begin(), mask.end(), 0.0);
+    mask[0] = 1;
+    idx = mult(idx, mask);
+
+    Ctxt idx_masked_clone = idx->Clone();
+
+    for (int i = 0; i < log2(bits); i++) {
+        idx = add(idx, rot(idx, -pow(2, i)));
+    }
+
+    idx = add(idx, rot(idx_masked_clone, -bits));
+    idx = add(idx, rot(idx_masked_clone, -bits-1));
+
+    //LUT output occupies bits + 2 slots, so we repeat idx 'bits + 2' times
+
+    coeffs.clear();
+    for (int i = 0; i < bits + 2; i++) coeffs.push_back(read_vector_file("../coeffs/LUTs/" + to_string(bits) + " bits/division/LUT-DIVISION-32-bits-" + to_string(i) + ".txt"));
+    for (int i = 0; i < (bits * 2) - (bits + 2); i++) coeffs.push_back(read_vector_file("../coeffs/LUTs/" + to_string(bits) + " bits/division/LUT-DIVISION-32-bits-0.txt")); //Garbage
+
+    Ctxt x = get_context()->EvalChebyshevSeriesPSBatchRepeated(idx, coeffs, 0, 256, (int)(idx->GetSlots() / coeffs.size()));
+    x = binboot(x);
+
+    //x is the actual hint, let's go
+
+    for (int iter = 0; iter < 3; iter++) {
+        Ctxt term = mul_integer(x, den_norm, bits * 2, bits * 2, 1, 1, true);
+
+        fill(mask.begin(), mask.end(), 0.0);
+        for (int i = 0; i < bits*2+1; i++) mask[i] = 1;
+        term = sub(encode(mask, term->GetLevel()), term);
+
+        // here we should have a +1, but for convergence is not required i guess? it will get canceled after anyways
+
+        term = rot(term, bits); //Removing the first 'bits' least significative
+
+        x = mul_integer(x, term, bits * 2, bits * 2, 1, 1, true);
+
+        x = rot(x, bits);
+
+    }
+
+    Ctxt result = mul_integer(num, x, bits * 2, bits * 2, 1, 1, true);
+
+    cout << "result before blind: " << cc.print_ints(result, 32 * 4, 1) << endl;
+
+    result = rot(result, bits);
+
+    fill(mask.begin(), mask.end(), 0.0);
+    for (int i = 0; i < 32 * 4; i++) mask[i] = 1;
+    result = mult(result, mask);
+
+    result = blind_rotation(result, s, bits * 2);
+
+    result = rot(result, bits);
+    result = mult(result, mask);
+
+    return result;
+}
+
+
 Ctxt CKKSController::reduce(const Ctxt &c) {
     return context->EvalSub(context->EvalMult(c, 2), context->EvalSquare(c));
 }
@@ -722,6 +911,7 @@ Ctxt CKKSController::bootstrap(const Ctxt &c) {
 Ctxt CKKSController::binboot(const Ctxt &c) {
     //cout << "Input level : " << c->GetLevel() << endl;
     Ctxt cboot = context->EvalBootstrapStCFirstBits(c);
+    cout << "X" << endl;
     //cout << "Output level: " << cboot->GetLevel() << endl;
     return cboot;
 }
@@ -746,7 +936,7 @@ void CKKSController::print(const Ctxt &c) {
     result->SetSlots(s);
     vector<double> v = result->GetRealPackedValue();
 
-    cout << "[ ";
+    cout << "(Level: " << c->GetLevel() << ") [ ";
 
     for (int i = 0; i < s; i += 1) {
         string segno = "";
@@ -783,7 +973,7 @@ void CKKSController::print(const Ctxt &c, int slots) {
     result->SetSlots(s);
     vector<double> v = result->GetRealPackedValue();
 
-    cout << "[ ";
+    cout << "(Level: " << c->GetLevel() << ") [ ";
 
     for (int i = 0; i < s; i += 1) {
         string segno = "";

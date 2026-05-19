@@ -30,6 +30,7 @@ public:
     void generate_rotation_keys_inverse(vector<int> indexes);
     void generate_rotations_for_additions(int bits);
     void generate_rotations_for_multiplications(int bits);
+    void generate_rotations_for_bit_length(int bits);
 
     Ptxt encode(const vector<double>& vec, int lvl = 0);
     Ptxt encode(const vector<int>& vec, int lvl = 0);
@@ -53,6 +54,7 @@ public:
 
     Ctxt sub(const Ctxt& c1, const Ctxt& c2);
     Ctxt sub(const Ctxt& c, const Ptxt& p);
+    Ctxt sub(const Ptxt& p, const Ctxt& c);
     Ctxt sub(double d, const Ctxt& c);
 
     Ctxt mult(const Ctxt& c1, const Ctxt& c2);
@@ -80,10 +82,20 @@ public:
     // Old implementation
     Ctxt binary_mult(const Ctxt &a, const Ctxt &b, int bits, int repetitions);
 
+    Ctxt binary_or(const Ctxt& a, const Ctxt& b);
+    Ctxt binary_and(const Ctxt& a, const Ctxt& b);
+
     Ctxt add_integer(const Ctxt& a, const Ctxt& b, int bits, bool clean_first = false);
     Ctxt sub_integer(const Ctxt &a, const Ctxt &b, int bits, bool clean_first = false);
     Ctxt mul_integer(const Ctxt &a, const Ctxt &b, int bits, int bits_original, int repetitions, int repetitions_original, bool overflow);
     Ctxt shf_integer(const Ctxt& a, int shift, int bits);
+
+    // Advanced arithmetic operations
+    Ctxt bit_length(const Ctxt& a, int bits);
+    Ctxt inverse_bit_length(const Ctxt& a, int bits);
+    Ctxt blind_rotation(const Ctxt& a, const Ctxt &index, int bits);
+    Ctxt div_integer(const Ctxt& a, const Ctxt &b, int bits);
+
 
     Ctxt bootstrap(const Ctxt& c);
     Ctxt binboot(const Ctxt& c);

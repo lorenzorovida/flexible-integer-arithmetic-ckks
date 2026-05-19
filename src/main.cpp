@@ -13,7 +13,7 @@ using namespace chrono;
 CKKSController cc;
 int ring_size = 12;
 int verbose = 2;
-int wordsize = 128;
+int wordsize = 32;
 
 bool test = false;
 bool input_mode = false;
@@ -27,8 +27,158 @@ int main(int argc, char* argv[]) {
 
     // Con 13 levels 256-bits
     cc.generate_context_for_bootstrapping(1 << ring_size, 13);
-    cc.generate_rotations_for_additions(wordsize);
-    cc.generate_rotations_for_multiplications(wordsize);
+    cc.generate_rotations_for_additions(wordsize * 2);
+    cc.generate_rotations_for_multiplications(wordsize * 2);
+    cc.generate_rotations_for_bit_length(wordsize);
+
+    /*
+     * Experiments
+     */
+    Ctxt numerator = cc.encrypt_multi_int({3200232430, 0, 0, 0}, 32, 12);
+    Ctxt inpt = cc.encrypt_multi_int({10000003,200,300,400}, 32, 12);
+    Ctxt b = cc.inverse_bit_length(inpt, 32);
+    cc.print(b, 32);
+
+
+    vector<vector<double>> coeffs;
+    coeffs.push_back(read_vector_file("../coeffs/p1-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p2-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p3-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p4-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p5-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p6-norm-247-LUT-DIVISION.txt"));
+    coeffs.push_back(read_vector_file("../coeffs/p7-norm-247-LUT-DIVISION.txt"));
+
+    for (int i = 0; i < 32-7; i++) {
+        // Garbage
+        coeffs.push_back(read_vector_file("../coeffs/p1-norm-247-LUT-DIVISION.txt"));
+    }
+
+
+    Ctxt s = cc.get_context()->EvalChebyshevSeriesPSBatchRepeated(b, coeffs, -1, 1, (int)(b->GetSlots() / coeffs.size()));
+
+    s = cc.binboot(s);
+
+    cout << "s_bin: ";
+    cc.print(s, 32);
+
+
+    Ctxt b_norm = cc.blind_rotation(inpt, s, 32);
+    cout << "b_norm: ";
+    cc.print(b_norm, 32*2);
+
+    b_norm = cc.binboot(b_norm);
+
+    int LUT_BITS = 8;
+    Ctxt b_norm_rot = cc.rot(b_norm, 32 - 1 - LUT_BITS);
+
+    cout << "b_norm_rot: ";
+    cc.print(b_norm_rot, 32*2);
+
+
+
+
+    vector<double> mask_idx(b_norm_rot->GetSlots());
+    for (int i = 0; i < LUT_BITS; i++) mask_idx[i] = pow(2, i);
+    Ctxt idx = cc.mult(b_norm_rot, mask_idx);
+
+    //Idx is in decimal
+    for (int i = 0; i < log2(256); i++) {
+        idx = cc.add(idx, cc.rot(idx, pow(2, i)));
+    }
+
+    vector<double> mask_first(idx->GetSlots());
+    mask_first[0] = 1;
+    idx = cc.mult(idx, mask_first);
+
+    Ctxt idx_masked_clone = idx->Clone();
+
+    for (int i = 0; i < log2(32); i++) {
+        idx = cc.add(idx, cc.rot(idx, -pow(2, i)));
+    }
+
+    idx = cc.add(idx, cc.rot(idx_masked_clone, -32));
+    idx = cc.add(idx, cc.rot(idx_masked_clone, -32-1));
+
+    cout << "idx (decimal): ";
+    cc.print(idx, 32+2);
+    cout << idx->GetLevel() << endl;
+
+    coeffs.clear();
+    for (int i = 0; i < 32 + 2; i++) {
+        coeffs.push_back(read_vector_file("../coeffs/LUTs/32 bits/division/LUT-DIVISION-32-bits-" + to_string(i) + ".txt"));
+    }
+    for (int i = 0; i < (32 * 2) - (32 + 2); i++) {
+        //Garbage
+        coeffs.push_back(read_vector_file("../coeffs/LUTs/32 bits/division/LUT-DIVISION-32-bits-0.txt"));
+    }
+
+
+
+    Ctxt binx = cc.get_context()->EvalChebyshevSeriesPSBatchRepeated(idx, coeffs, 0, 256, (int)(idx->GetSlots() / coeffs.size()));
+    binx = cc.binboot(binx);
+
+    cout << "b_norm: " << cc.print_ints(b_norm, 64, 1) << endl;
+    cout << "x: " << cc.print_ints(binx, 64, 1) << endl;
+
+    for (int iter = 0; iter < 3; iter++) {
+
+        Ctxt term = cc.mul_integer(b_norm, binx, 64, 64, 1, 1, true);
+
+        cout << "term1: " << cc.print_ints(term, 128, 1) << endl;
+
+
+        vector<double> vl(term->GetSlots());
+        for (int i = 0; i < 32*2+1; i++) vl[i] = 1;
+        term = cc.sub(cc.encode(vl, term->GetLevel()), term);
+
+        // here we should have a +1, but for convergence is not required i guess? it will get canceled after anyways
+
+        cout << "term2: " << cc.print_ints(term, 32 * 4, 1) << endl;
+
+        term = cc.rot(term, 32); //Tolgo i 32 bit meno significativi..
+
+        binx = cc.mul_integer(binx, term, 32 * 2, 32 * 2, 1, 1, true);
+
+        cout << "x1: " << cc.print_ints(binx, 32 * 2, 1) << endl;
+
+        binx = cc.rot(binx, 32);
+
+        cout << "x2: " << cc.print_ints(binx, 32 * 2, 1) << endl;
+
+    }
+
+    Ctxt result = cc.mul_integer(numerator, binx, 64, 64, 1, 1, true);
+
+    cout << "result before blind: " << cc.print_ints(result, 32 * 4, 1) << endl;
+
+    result = cc.rot(result, 32);
+    vector<double> firstnmask(result->GetSlots());
+    for (int i = 0; i < 32 * 4; i++) firstnmask[i] = 1;
+    result = cc.mult(result, firstnmask);
+
+    cout << "result before blind: " << cc.print_ints(result, 32 * 4, 1) << endl;
+
+
+    cc.print(s, 32 * 2);
+
+    result = cc.blind_rotation(result, s, 32 * 2);
+
+    cout << "result before blind: " << cc.print_ints(result, 32 * 2, 1) << endl;
+
+    result = cc.rot(result, 32);
+    result = cc.mult(result, firstnmask);
+
+
+    cout << "result before blind: ";
+    cout << cc.print_ints(result, 9, 1);
+
+
+    exit(0);
+
+    /*
+     * End experiments
+     */
 
     if (test) {
         cout << "Keygen works, you are good to go to use the program :)" << endl;

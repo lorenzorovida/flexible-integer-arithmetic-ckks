@@ -5,3 +5,5 @@ openfhe/.DS_Store
 /openfhe/cmake-build-release
 /build
 /.idea
+/cmake-build-debug
+/cmake-build-release
